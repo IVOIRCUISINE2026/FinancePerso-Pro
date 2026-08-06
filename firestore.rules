@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Entity validations
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName']) &&
+             data.keys().size() <= 10 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.displayName is string && data.displayName.size() <= 128 &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2000)) &&
+             (!('weeklyReports' in data) || data.weeklyReports is bool) &&
+             (!('budgetNotifications' in data) || data.budgetNotifications is bool);
+    }
+
+    function isValidTransaction(data, userId) {
+      return data.keys().hasAll(['amount', 'category', 'date', 'userId']) &&
+             data.keys().size() <= 6 &&
+             data.userId == userId &&
+             data.amount is number && data.amount >= 0 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.date is number &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 500));
+    }
+
+    function isValidIncome(data, userId) {
+      return data.keys().hasAll(['salaryReceived', 'dateReceived', 'userId']) &&
+             data.keys().size() <= 4 &&
+             data.userId == userId &&
+             data.salaryReceived is number && data.salaryReceived >= 0 &&
+             data.dateReceived is number;
+    }
+
+    function isValidBudget(data, userId) {
+      return data.keys().hasAll(['category', 'amount', 'userId']) &&
+             data.keys().size() <= 3 &&
+             data.userId == userId &&
+             data.category is string && data.category.size() <= 50 &&
+             data.amount is number && data.amount >= 0;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isVerified() && isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isVerified() && isOwner(userId) && 
+                      isValidUserProfile(incoming()) && 
+                      incoming().uid == existing().uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'email', 'weeklyReports', 'budgetNotifications']);
+
+      match /transactions/{transactionId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(transactionId) && isValidTransaction(incoming(), userId);
+        allow update: if isOwner(userId) && 
+                        isValidTransaction(incoming(), userId) &&
+                        incoming().userId == existing().userId &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['amount', 'category', 'date', 'note']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /incomes/{incomeId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(incomeId) && isValidIncome(incoming(), userId);
+        allow update: if isOwner(userId) && 
+                        isValidIncome(incoming(), userId) &&
+                        incoming().userId == existing().userId &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['salaryReceived', 'dateReceived']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /budgets/{categoryId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        // Allow spaces and accented characters for categories used as IDs
+        allow create, update: if isOwner(userId) && 
+                                categoryId is string && categoryId.size() <= 128 &&
+                                isValidBudget(incoming(), userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /reports/{reportId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(reportId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /archives/{archiveId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(archiveId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

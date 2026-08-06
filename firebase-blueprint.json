@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A daily expense transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "number" },
+        "note": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["amount", "category", "date", "userId"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "Salary received record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "salaryReceived": { "type": "number" },
+        "dateReceived": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["salaryReceived", "dateReceived", "userId"]
+    },
+    "CategoryBudget": {
+      "title": "CategoryBudget",
+      "description": "Monthly budget limit for a specific category",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["category", "amount", "userId"]
+    },
+    "Archive": {
+      "title": "Archive",
+      "description": "Monthly archived financial data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "monthLabel": { "type": "string" },
+        "archivedAt": { "type": "number" },
+        "totalIncome": { "type": "number" },
+        "totalExpenses": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "monthLabel", "archivedAt", "totalIncome", "totalExpenses", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User personal data"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User transactions"
+    },
+    "/users/{userId}/incomes/{incomeId}": {
+      "schema": "Income",
+      "description": "User income history"
+    },
+    "/users/{userId}/budgets/{categoryId}": {
+      "schema": "CategoryBudget",
+      "description": "User category budgets"
+    },
+    "/users/{userId}/archives/{archiveId}": {
+      "schema": "Archive",
+      "description": "User monthly archived data"
+    }
+  }
+}

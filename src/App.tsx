@@ -1,0 +1,423 @@
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { Dashboard } from './components/Dashboard';
+import { Analytics } from './components/Analytics';
+import { BudgetDistribution } from './components/BudgetDistribution';
+import { Settings } from './components/Settings';
+import { Summary } from './components/Summary';
+import { TransactionForm } from './components/TransactionForm';
+import { FinancialBot } from './components/FinancialBot';
+import { ConfirmModal } from './components/ConfirmModal';
+import { useFinance } from './hooks/useFinance';
+import { signInWithGoogle, logout } from './lib/firebase';
+import { Wallet, LogIn, Loader2, List, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { DateTimeDisplay } from './components/DateTimeDisplay';
+import { TransactionCategory } from './types';
+import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd } from './lib/utils';
+import { exportBudgetStatusToPDF, exportDetailedExpensesToPDF } from './lib/pdfExport';
+import { Archives } from './components/Archives';
+
+export default function App() {
+  const { 
+    user, 
+    loading, 
+    transactions, 
+    incomes, 
+    budgets,
+    reports,
+    archives,
+    profile,
+    addTransaction, 
+    deleteTransaction,
+    deleteTransactionsByCategory,
+    addIncome, 
+    addReport,
+    syncUserProfile,
+    updateUserProfile,
+    updateCategoryBudget,
+    archiveMonth,
+    deleteArchive
+  } = useFinance();
+  
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isForcedLandscape, setIsForcedLandscape] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<React.ReactNode | null>(null);
+  const [showAutoArchiveSuccess, setShowAutoArchiveSuccess] = useState<string | null>(null);
+
+  // Automatic archive on the 25th of the month
+  useEffect(() => {
+    if (!user || loading || (transactions.length === 0 && incomes.length === 0)) return;
+
+    const today = new Date();
+    if (today.getDate() === 25) {
+      const monthYearKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      const dStart = new Date(today.getFullYear(), today.getMonth() - 1, 25);
+      const dEnd = new Date(today.getFullYear(), today.getMonth(), 25);
+      const completedPeriodLabel = `Période du ${dStart.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au ${dEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      const capitalizedMonthLabel = completedPeriodLabel;
+
+      const isAlreadyArchived = archives && archives.some(arch => arch.id === monthYearKey);
+      if (!isAlreadyArchived) {
+        archiveMonth(monthYearKey, capitalizedMonthLabel).then(() => {
+          setShowAutoArchiveSuccess(capitalizedMonthLabel);
+        }).catch((err) => {
+          console.error("Auto archive failed", err);
+        });
+      }
+    }
+  }, [user, loading, transactions, incomes, archives, archiveMonth]);
+
+  useEffect(() => {
+    if (user) {
+      syncUserProfile();
+    }
+  }, [user]);
+
+  const handlePrint = () => {
+    exportBudgetStatusToPDF(transactions, budgets);
+  };
+
+  const handleExportDetails = () => {
+    exportDetailedExpensesToPDF(transactions);
+  };
+
+  const toggleOrientation = async () => {
+    try {
+      if (!isForcedLandscape) {
+        // Try hardware lock if possible
+        if (typeof screen.orientation !== 'undefined' && 'lock' in screen.orientation) {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          }
+          await (screen.orientation as any).lock('landscape');
+        }
+      } else {
+        if (typeof screen.orientation !== 'undefined' && 'unlock' in screen.orientation) {
+          (screen.orientation as any).unlock();
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Mobile orientation lock not supported or failed', e);
+    }
+    setIsForcedLandscape(!isForcedLandscape);
+  };
+
+  const hasBudgetAlerts = budgets.some(budget => {
+    const now = new Date();
+    const startOfPeriod = getBudgetPeriodStart(now);
+    const endOfPeriod = getBudgetPeriodEnd(now);
+    const spent = transactions
+      .filter(t => t.category === budget.category && t.date >= startOfPeriod && t.date <= endOfPeriod)
+      .reduce((sum, t) => sum + t.amount, 0);
+    return spent > budget.amount;
+  });
+
+  const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      console.error("Login Error", error);
+      
+      const openInNewTabLink = (
+        <a 
+          href={window.location.href} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="underline font-bold ml-1"
+        >
+          Ouvrir l'application dans un nouvel onglet
+        </a>
+      );
+
+      if (error.code === 'auth/popup-blocked') {
+        setLoginError(
+          <>
+            Le popup de connexion a été bloqué. Pour vous authentifier, veuillez {openInNewTabLink}.
+          </>
+        );
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        const isIframe = window.self !== window.top;
+        setLoginError(
+          <>
+            La fenêtre de connexion a été fermée. 
+            {isIframe ? (
+              <> 
+                Dans cet environnement (Iframe), cela peut être dû à des restrictions de sécurité. 
+                Veuillez {openInNewTabLink} pour vous connecter sans problème.
+              </>
+            ) : (
+              " Veuillez réessayer en cliquant sur le bouton ci-dessous."
+            )}
+          </>
+        );
+      } else if (error.code === 'auth/network-request-failed' || (error.message && error.message.includes('network-request-failed'))) {
+        const isIframe = window.self !== window.top;
+        setLoginError(
+          <>
+            Une erreur réseau s'est produite lors de la connexion. 
+            {isIframe ? (
+              <>
+                <br /><br />
+                <strong>Note importante :</strong> L'authentification Google est souvent bloquée par les navigateurs lorsqu'elle est exécutée dans un cadre (iframe). 
+                Veuillez impérativement {openInNewTabLink} pour vous connecter.
+              </>
+            ) : (
+              " Vérifiez votre connexion internet ou désactivez vos bloqueurs de publicité et réessayez."
+            )}
+          </>
+        );
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        setLoginError("La requête de connexion a été annulée ou est déjà en cours. Veuillez patienter ou recharger la page.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setLoginError("Ce domaine n'est pas autorisé. Ajoutez '" + window.location.hostname + "' aux domaines autorisés dans la console Firebase.");
+      } else if (error.code === 'auth/internal-error') {
+        setLoginError(
+          <>
+            Erreur interne Firebase. Cela arrive souvent à cause des restrictions des cookies tiers. Veuillez {openInNewTabLink}.
+          </>
+        );
+      } else if (error.code === 'auth/argument-error' || (error.message && error.message.includes('argument-error'))) {
+        setLoginError(
+          <>
+            Erreur de configuration d'authentification. Veuillez essayer de {openInNewTabLink} pour réinitialiser la session.
+          </>
+        );
+      } else if (error.message && error.message.includes('Assertion')) {
+        setLoginError(
+          <>
+            Une erreur interne Firebase est survenue. Cela arrive souvent dans les environnements intégrés. Veuillez {openInNewTabLink}.
+          </>
+        );
+      } else {
+        setLoginError("Erreur de connexion (" + (error.code || 'unknown') + "). Si le problème persiste, " + openInNewTabLink);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#0B0F19]">
+        <Loader2 className="w-8 h-8 text-[#2E5BFF] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-screen w-screen h-screen flex flex-col items-center justify-center bg-[#0B0F19] p-6 lg:p-0 relative">
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-10 z-20">
+          <DateTimeDisplay />
+        </div>
+        
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-[#161B29] p-12 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-8 border border-white/5"
+        >
+          <div className="w-20 h-20 bg-[#2E5BFF] rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
+            <Wallet className="text-white" size={40} />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-black text-white tracking-tight">FinancePerso Pro</h1>
+            <p className="text-slate-400 leading-relaxed">Gérez votre salaire, suivez vos dépenses et optimisez votre budget mensuel.</p>
+          </div>
+          
+          {loginError && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="bg-red-500/10 text-red-400 p-4 rounded-xl text-sm font-medium border border-red-500/20"
+            >
+              {loginError}
+            </motion.div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            disabled={isLoggingIn}
+            className="w-full bg-[#2E5BFF] flex items-center justify-center gap-4 py-4 rounded-2xl font-bold text-white hover:bg-blue-600 transition-all active:scale-95 translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
+          >
+            {isLoggingIn ? (
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            ) : (
+              <LogIn size={20} className="text-white" />
+            )}
+            {isLoggingIn ? "Connexion..." : "Se connecter avec Google"}
+          </button>
+          
+          <p className="text-xs text-slate-500">
+            En vous connectant, vous acceptez nos conditions d'utilisation.
+          </p>
+
+          {window.self !== window.top && (
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[10px] text-slate-500 italic leading-relaxed">
+                Note : Si la connexion échoue, cliquez sur "Ouvrir l'application dans un nouvel onglet" en haut à droite pour contourner les restrictions de sécurité du navigateur.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  const handleAddTransaction = async (data: { amount: number, category: TransactionCategory, date: number, note: string }) => {
+    await addTransaction(data);
+    setActiveTab('dashboard');
+
+    // Alert check (10% of last salary)
+    const currentSalary = incomes.length > 0 ? incomes[0].salaryReceived : 0;
+    const totalSpent = transactions.reduce((acc, curr) => acc + curr.amount, 0) + data.amount;
+    const balance = currentSalary - totalSpent;
+    if (balance < (0.1 * currentSalary)) {
+      alert(`Attention ! Votre solde (${formatCurrency(balance)}) est inférieur à 10% de votre salaire.`);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-[#0B0F19] relative overflow-hidden">
+      {/* Background Decorative Bubbles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          animate={{ x: [0, 50, 0], y: [0, 30, 0] }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#2E5BFF]/5 rounded-full blur-[120px]" 
+        />
+        <motion.div 
+          animate={{ x: [0, -40, 0], y: [0, -50, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px]" 
+        />
+      </div>
+
+      <Sidebar 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        onLogout={logout} 
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        onExportStatus={handlePrint}
+        onExportDetails={handleExportDetails}
+        onToggleOrientation={toggleOrientation}
+        hasBudgetAlerts={hasBudgetAlerts}
+      />
+
+      {/* Floating Assistant Bubble */}
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setActiveTab('assistant')}
+        className={cn(
+          "fixed bottom-8 right-8 w-14 h-14 bg-[#2E5BFF] rounded-full shadow-lg shadow-blue-500/20 flex items-center justify-center text-white z-50 md:hidden",
+          activeTab === 'assistant' && "hidden"
+        )}
+      >
+        <Sparkles size={24} />
+        {hasBudgetAlerts && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#161B29] flex items-center justify-center text-[10px] font-bold">
+            !
+          </span>
+        )}
+      </motion.button>
+
+      <main className="flex-1 overflow-y-auto p-6 md:p-10 relative">
+        <div className="flex justify-end mb-8 sticky top-0 z-20 pointer-events-none">
+          <div className="pointer-events-auto">
+            <DateTimeDisplay />
+          </div>
+        </div>
+        
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeTab === 'dashboard' && (
+              <Dashboard 
+                transactions={transactions} 
+                incomes={incomes} 
+                budgets={budgets}
+                onTabChange={setActiveTab}
+                onDeleteTransaction={deleteTransaction}
+                onClearCategory={deleteTransactionsByCategory}
+                onUpdateBudget={updateCategoryBudget}
+              />
+            )}
+            
+            {activeTab === 'add' && (
+              <div className="max-w-xl mx-auto pt-12">
+                <TransactionForm onAdd={handleAddTransaction} />
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <Analytics transactions={transactions} incomes={incomes} />
+            )}
+
+            {activeTab === 'summary' && (
+              <Summary transactions={transactions} incomes={incomes} budgets={budgets} />
+            )}
+            
+            {activeTab === 'assistant' && (
+              <FinancialBot transactions={transactions} budgets={budgets} incomes={incomes} />
+            )}
+
+            {activeTab === 'archives' && (
+              <Archives 
+                archives={archives}
+                transactions={transactions}
+                incomes={incomes}
+                budgets={budgets}
+                onArchiveMonth={archiveMonth}
+                onDeleteArchive={deleteArchive}
+              />
+            )}
+
+            {activeTab === 'distribution' && (
+              <BudgetDistribution transactions={transactions} incomes={incomes} budgets={budgets} />
+            )}
+
+            {activeTab === 'settings' && (
+              <Settings 
+                user={user} 
+                incomes={incomes} 
+                transactions={transactions}
+                reports={reports}
+                profile={profile}
+                onAddSalary={addIncome} 
+                onUpdateProfile={updateUserProfile}
+                onAddReport={addReport}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Auto archive success modal */}
+      <ConfirmModal
+        isOpen={showAutoArchiveSuccess !== null}
+        onClose={() => setShowAutoArchiveSuccess(null)}
+        onConfirm={() => setShowAutoArchiveSuccess(null)}
+        title="Archivage automatique réussi !"
+        message={`Nous sommes le 25 du mois ! Vos données financières de la période active ont été archivées avec succès dans l'onglet 'Archives' sous '${showAutoArchiveSuccess}', et votre tableau de bord actuel a été réinitialisé.`}
+        confirmText="Compris !"
+        cancelText="Fermer"
+        variant="primary"
+      />
+    </div>
+  );
+}

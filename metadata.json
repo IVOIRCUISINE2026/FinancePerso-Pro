@@ -1,0 +1,6 @@
+{
+  "name": "FinancePerso Pro",
+  "description": "Application professionnelle de suivi de salaire et gestion des dépenses mensuelles avec analyses détaillées.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["Finance Management", "Data Visualization", "Budget Tracking", "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
