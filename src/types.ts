@@ -15,7 +15,7 @@ export enum TransactionCategory {
 export interface Transaction {
   id: string;
   amount: number;
-  category: TransactionCategory;
+  category: TransactionCategory | string;
   date: number; // timestamp
   note: string;
   userId: string;

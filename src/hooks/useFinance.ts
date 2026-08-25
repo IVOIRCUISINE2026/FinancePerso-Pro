@@ -256,6 +256,16 @@ export function useFinance() {
     }
   }, [user]);
 
+  const deleteCategoryBudget = useCallback(async (category: string) => {
+    if (!user) return;
+    const path = `users/${user.uid}/budgets/${category}`;
+    try {
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  }, [user]);
+
   const addTransaction = useCallback(async (data: Omit<Transaction, 'id' | 'userId'>) => {
     if (!user) return;
     const path = `users/${user.uid}/transactions`;
@@ -354,6 +364,7 @@ export function useFinance() {
     syncUserProfile,
     updateUserProfile,
     updateCategoryBudget,
+    deleteCategoryBudget,
     archiveMonth,
     deleteArchive
   };

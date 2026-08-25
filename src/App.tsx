@@ -14,7 +14,7 @@ import { Wallet, LogIn, Loader2, List, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DateTimeDisplay } from './components/DateTimeDisplay';
 import { TransactionCategory } from './types';
-import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd } from './lib/utils';
+import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd, getAvailableCategories } from './lib/utils';
 import { exportBudgetStatusToPDF, exportDetailedExpensesToPDF } from './lib/pdfExport';
 import { Archives } from './components/Archives';
 
@@ -31,6 +31,7 @@ export default function App() {
     addTransaction, 
     deleteTransaction,
     deleteTransactionsByCategory,
+    deleteCategoryBudget,
     addIncome, 
     addReport,
     syncUserProfile,
@@ -272,7 +273,7 @@ export default function App() {
     );
   }
 
-  const handleAddTransaction = async (data: { amount: number, category: TransactionCategory, date: number, note: string }) => {
+  const handleAddTransaction = async (data: { amount: number, category: string, date: number, note: string }) => {
     await addTransaction(data);
     setActiveTab('dashboard');
 
@@ -355,12 +356,16 @@ export default function App() {
                 onDeleteTransaction={deleteTransaction}
                 onClearCategory={deleteTransactionsByCategory}
                 onUpdateBudget={updateCategoryBudget}
+                onDeleteCategoryBudget={deleteCategoryBudget}
               />
             )}
             
             {activeTab === 'add' && (
               <div className="max-w-xl mx-auto pt-12">
-                <TransactionForm onAdd={handleAddTransaction} />
+                <TransactionForm 
+                  onAdd={handleAddTransaction} 
+                  categories={getAvailableCategories(budgets, transactions)}
+                />
               </div>
             )}
 

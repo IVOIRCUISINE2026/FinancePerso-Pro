@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Transaction, CategoryBudget, TransactionCategory } from '../types';
-import { formatCurrency, getBudgetPeriodStart, getBudgetPeriodEnd, formatBudgetPeriod } from './utils';
+import { formatCurrency, getBudgetPeriodStart, getBudgetPeriodEnd, formatBudgetPeriod, getAvailableCategories } from './utils';
 
 export function exportBudgetStatusToPDF(
   transactions: Transaction[],
@@ -22,8 +22,9 @@ export function exportBudgetStatusToPDF(
   doc.text(`Généré le : ${now.toLocaleString('fr-FR')}`, 14, 30);
   doc.text(`Période : ${formatBudgetPeriod(startOfPeriod, endOfPeriod)}`, 14, 35);
 
-  // Prepare data
-  const statusData = Object.values(TransactionCategory).map((category) => {
+  // Prepare data across all available categories
+  const allCategories = getAvailableCategories(budgets, transactions);
+  const statusData = allCategories.map((category) => {
     const budgetObj = budgets.find(b => b.category === category);
     let budget = budgetObj ? budgetObj.amount : 0;
     if (!budgetObj && category === TransactionCategory.EAU) {

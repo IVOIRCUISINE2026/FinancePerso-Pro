@@ -54,3 +54,43 @@ export function formatBudgetPeriod(startTimestamp: number, endTimestamp: number)
   const endLabel = end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   return `du ${startLabel} au ${endLabel}`;
 }
+
+export const DEFAULT_CATEGORIES: string[] = [
+  "Marché",
+  "Déjeuner",
+  "Riz",
+  "Électricité",
+  "Gaz",
+  "Savon",
+  "Canal+",
+  "Transport",
+  "Internet",
+  "Eau",
+  "Divers",
+];
+
+export function getAvailableCategories(
+  budgets: { category: string }[] = [],
+  transactions: { category: string }[] = []
+): string[] {
+  const categorySet = new Set<string>(DEFAULT_CATEGORIES);
+  
+  if (Array.isArray(budgets)) {
+    budgets.forEach((b) => {
+      if (b && b.category && b.category.trim()) {
+        categorySet.add(b.category.trim());
+      }
+    });
+  }
+
+  if (Array.isArray(transactions)) {
+    transactions.forEach((t) => {
+      if (t && t.category && t.category.trim()) {
+        categorySet.add(t.category.trim());
+      }
+    });
+  }
+
+  return Array.from(categorySet);
+}
+

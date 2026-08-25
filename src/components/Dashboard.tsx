@@ -1,10 +1,12 @@
 import { Transaction, Income, CategoryBudget, TransactionCategory } from '../types';
-import { formatCurrency, formatDate, cn, getBudgetPeriodStart, getBudgetPeriodEnd, formatBudgetPeriod } from '../lib/utils';
-import { TrendingUp, TrendingDown, CreditCard, Clock, Trash2, PieChart as PieIcon, Info, PlusCircle, Edit2, Check, X as CloseIcon, Printer } from 'lucide-react';
+import { formatCurrency, formatDate, cn, getBudgetPeriodStart, getBudgetPeriodEnd, formatBudgetPeriod, getAvailableCategories, DEFAULT_CATEGORIES } from '../lib/utils';
+import { TrendingUp, TrendingDown, CreditCard, Clock, Trash2, PieChart as PieIcon, Info, PlusCircle, Edit2, Check, X as CloseIcon, Printer, SlidersHorizontal, Plus, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useState } from 'react';
 import { ConfirmModal } from './ConfirmModal';
+import { BudgetModal } from './BudgetModal';
+import { AddCategoryModal } from './AddCategoryModal';
 import { exportBudgetStatusToPDF } from '../lib/pdfExport';
 
 interface DashboardProps {
@@ -15,6 +17,7 @@ interface DashboardProps {
   onDeleteTransaction?: (id: string) => void;
   onClearCategory?: (category: string) => void;
   onUpdateBudget?: (category: string, amount: number) => void;
+  onDeleteCategoryBudget?: (category: string) => void;
 }
 
 const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#F43F5E', '#8B5CF6', '#EC4899', '#06B6D4'];
@@ -73,10 +76,13 @@ function ProgressMetric({ title, percentage, color }: { title: string, percentag
 }
 
 
-export function Dashboard({ transactions, incomes, budgets, onTabChange, onDeleteTransaction, onClearCategory, onUpdateBudget }: DashboardProps) {
+export function Dashboard({ transactions, incomes, budgets, onTabChange, onDeleteTransaction, onClearCategory, onUpdateBudget, onDeleteCategoryBudget }: DashboardProps) {
   const [categoryToClear, setCategoryToClear] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState<boolean>(false);
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState<boolean>(false);
+  const [modalBudgetCategory, setModalBudgetCategory] = useState<string | null>(null);
 
   const now = new Date();
   const startOfPeriod = getBudgetPeriodStart(now);
@@ -93,6 +99,17 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
   const today = new Date().setHours(0, 0, 0, 0);
   const todayTransactions = transactions.filter(t => new Date(t.date).setHours(0, 0, 0, 0) === today);
 
+  // Available categories (default + custom from budgets and transactions)
+  const allCategories = getAvailableCategories(budgets, transactions);
+
+  // Current expense map by category
+  const expensesByCategory: Record<string, number> = {};
+  transactions
+    .filter(t => t.date >= startOfPeriod && t.date <= endOfPeriod)
+    .forEach(t => {
+      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
+    });
+
   // Quick Analytics Data
   const chartData = transactions
     .filter(t => t.date >= startOfPeriod && t.date <= endOfPeriod)
@@ -108,8 +125,8 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
 
   const savingsRate = totalSalary > 0 ? (balance / totalSalary) * 100 : 0;
 
-  // Budget Status calculation
-  const statusData = Object.values(TransactionCategory).map((category) => {
+  // Budget Status calculation across ALL available categories
+  const statusData = allCategories.map((category) => {
     const budgetObj = budgets.find(b => b.category === category);
     let budget = budgetObj ? budgetObj.amount : 0;
     if (!budgetObj && category === TransactionCategory.EAU) {
@@ -139,6 +156,15 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
       onUpdateBudget?.(editingCategory, amount);
       setEditingCategory(null);
     }
+  };
+
+  const handleOpenBudgetModal = (category?: string) => {
+    setModalBudgetCategory(category || allCategories[0] || Object.values(TransactionCategory)[0]);
+    setIsBudgetModalOpen(true);
+  };
+
+  const handleAddCategory = (name: string, budget: number) => {
+    onUpdateBudget?.(name, budget);
   };
 
   const totalBudget = statusData.reduce((acc, curr) => acc + curr.budget, 0);
@@ -318,27 +344,55 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
 
       {/* Budget Status Table Section */}
       <div className="bg-[#161B29] rounded-3xl border border-white/5 overflow-hidden">
-        <div className="p-8 border-b border-white/5 flex items-center justify-between">
+        <div className="p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
            <div className="flex items-center gap-2">
              <span className="w-4 h-4 bg-white/10 rounded-sm flex items-center justify-center text-white text-[10px]">📋</span>
              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Statut Budgétaire par Catégorie</h3>
+             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/5 text-slate-400 border border-white/5">
+               {allCategories.length} catégories
+             </span>
            </div>
            
-           <button 
-             onClick={() => exportBudgetStatusToPDF(transactions, budgets)}
-             className="flex items-center gap-2 bg-[#3B82F6]/10 hover:bg-[#3B82F6]/20 text-[#3B82F6] px-4 py-2 rounded-xl transition-all border border-[#3B82F6]/20 group"
-             title="Télécharger le rapport PDF"
-           >
-             <Printer size={16} className="group-hover:rotate-12 transition-transform" />
-             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Exporter PDF</span>
-           </button>
+           <div className="flex flex-wrap items-center gap-2">
+             <button 
+               onClick={() => setIsAddCategoryModalOpen(true)}
+               className="flex items-center gap-1.5 bg-[#10B981] hover:bg-emerald-600 text-white px-3.5 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 group font-bold text-xs"
+               title="Ajouter une nouvelle ligne / catégorie au budget"
+             >
+               <Plus size={15} className="group-hover:rotate-90 transition-transform" />
+               <span>Ajouter une ligne</span>
+             </button>
+
+             <button 
+               onClick={() => handleOpenBudgetModal()}
+               className="flex items-center gap-2 bg-[#3B82F6] hover:bg-blue-600 text-white px-3.5 py-2 rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95 group font-bold text-xs"
+               title="Modifier et gérer les budgets par catégorie"
+             >
+               <SlidersHorizontal size={15} className="group-hover:rotate-45 transition-transform" />
+               <span>Modifier les budgets</span>
+             </button>
+
+             <button 
+               onClick={() => exportBudgetStatusToPDF(transactions, budgets)}
+               className="flex items-center gap-2 bg-[#3B82F6]/10 hover:bg-[#3B82F6]/20 text-[#3B82F6] px-3.5 py-2 rounded-xl transition-all border border-[#3B82F6]/20 group font-bold text-xs"
+               title="Télécharger le rapport PDF"
+             >
+               <Printer size={15} className="group-hover:rotate-12 transition-transform" />
+               <span className="hidden sm:inline">Exporter PDF</span>
+             </button>
+           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#1D2433] text-[10px] font-black text-[#3B82F6] uppercase tracking-widest">
                 <th className="px-8 py-4">Catégorie</th>
-                <th className="px-8 py-4 text-right">Budget</th>
+                <th className="px-8 py-4 text-right">
+                  <div className="flex items-center justify-end gap-1.5 cursor-pointer hover:text-blue-300 transition-colors" onClick={() => handleOpenBudgetModal()} title="Cliquer pour gérer les budgets">
+                    <span>Budget</span>
+                    <Edit2 size={11} className="text-[#3B82F6]" />
+                  </div>
+                </th>
                 <th className="px-8 py-4 text-right">Actuel</th>
                 <th className="px-8 py-4 text-right">Restant</th>
                 <th className="px-8 py-4 text-center">Statut</th>
@@ -351,30 +405,61 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
                 <tr key={index} className="text-[12px] font-medium hover:bg-white/[0.02] transition-colors">
                   <td className="px-8 py-5 text-slate-300 flex items-center gap-2">
                     <span className="opacity-50">📋</span>
-                    {item.category}
+                    <span className="font-semibold">{item.category}</span>
                   </td>
                   <td className="px-8 py-5 text-slate-300 text-right">
                     {editingCategory === item.category ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <input 
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveBudget()}
-                          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 w-24 text-right text-white focus:outline-none focus:border-blue-500"
-                          autoFocus
-                        />
-                        <button onClick={handleSaveBudget} className="text-emerald-500 p-1 hover:bg-emerald-500/10 rounded"><Check size={14}/></button>
-                        <button onClick={() => setEditingCategory(null)} className="text-rose-500 p-1 hover:bg-rose-500/10 rounded"><CloseIcon size={14}/></button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <div className="relative">
+                          <input 
+                            type="number"
+                            min="0"
+                            step="500"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveBudget();
+                              if (e.key === 'Escape') setEditingCategory(null);
+                            }}
+                            className="bg-[#1D2433] border-2 border-[#3B82F6] rounded-xl px-2.5 py-1.5 w-32 text-right text-white font-bold text-xs focus:outline-none shadow-lg shadow-blue-500/10 pr-12"
+                            placeholder="0"
+                            autoFocus
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 pointer-events-none">
+                            F.CFA
+                          </span>
+                        </div>
+                        <button 
+                          onClick={handleSaveBudget} 
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg shadow-md shadow-emerald-500/20 transition-transform active:scale-90"
+                          title="Valider (Entrée)"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setEditingCategory(null)} 
+                          className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 p-1.5 rounded-lg transition-colors"
+                          title="Annuler (Échap)"
+                        >
+                          <CloseIcon size={14} />
+                        </button>
                       </div>
                     ) : (
-                      <button 
-                        onClick={() => handleStartEdit(item.category, item.budget)}
-                        className="group flex items-center justify-end gap-2 ml-auto hover:text-white transition-colors"
-                      >
-                        {item.budget > 0 ? formatCurrency(item.budget) : <span className="text-slate-500">Définir...</span>}
-                        <Edit2 size={12} className="opacity-0 group-hover:opacity-100" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button 
+                          onClick={() => handleStartEdit(item.category, item.budget)}
+                          className="group/btn flex items-center justify-end gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-[#3B82F6]/15 border border-white/5 hover:border-[#3B82F6]/30 transition-all text-right shadow-sm"
+                          title="Cliquer pour modifier directement ce budget"
+                        >
+                          <span className={cn(
+                            "font-bold transition-colors",
+                            item.budget > 0 ? "text-slate-200 group-hover/btn:text-white" : "text-slate-500 group-hover/btn:text-[#3B82F6] italic text-[11px]"
+                          )}>
+                            {item.budget > 0 ? formatCurrency(item.budget) : "Définir..."}
+                          </span>
+                          <Edit2 size={12} className="text-[#3B82F6] opacity-60 group-hover/btn:opacity-100 group-hover/btn:scale-110 transition-all shrink-0" />
+                        </button>
+                      </div>
                     )}
                   </td>
                   <td className="px-8 py-5 text-slate-300 text-right">
@@ -416,22 +501,42 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
                   </td>
                   <td className="px-8 py-5 text-right flex items-center justify-end gap-2">
                     <button 
+                      onClick={() => handleOpenBudgetModal(item.category)}
+                      className="p-2 text-slate-400 hover:text-[#3B82F6] hover:bg-blue-500/10 rounded-xl transition-all"
+                      title={`Modifier le budget de "${item.category}"`}
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
                       onClick={() => onTabChange?.('add')}
-                      className="p-2 text-slate-500 hover:text-[#3B82F6] hover:bg-blue-500/10 rounded-xl transition-all"
-                      title="Ajouter une dépense"
+                      className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all"
+                      title="Ajouter une dépense dans cette catégorie"
                     >
                       <PlusCircle size={16} />
                     </button>
                     <button 
                       onClick={() => setCategoryToClear(item.category)}
-                      className="p-2 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
-                      title="Effacer la catégorie"
+                      className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                      title="Effacer les dépenses ou retirer la catégorie"
                     >
                       <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>
               ))}
+
+              {/* Add Row Button inside Table */}
+              <tr className="border-t border-dashed border-white/10 hover:bg-white/[0.02] transition-colors">
+                <td colSpan={7} className="px-8 py-4">
+                  <button
+                    onClick={() => setIsAddCategoryModalOpen(true)}
+                    className="w-full py-2.5 px-4 rounded-xl border border-dashed border-white/15 hover:border-emerald-500/50 bg-white/[0.02] hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-400 font-bold text-xs transition-all flex items-center justify-center gap-2 group"
+                  >
+                    <Plus size={16} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                    <span>+ Ajouter une nouvelle ligne au statut budgétaire</span>
+                  </button>
+                </td>
+              </tr>
             </tbody>
             <tfoot className="bg-[#1D2433]/80 border-t-2 border-[#3B82F6]/50 sticky bottom-0 z-10 backdrop-blur-md">
               <tr className="text-[12px] font-black group">
@@ -492,15 +597,45 @@ export function Dashboard({ transactions, incomes, budgets, onTabChange, onDelet
         </div>
       </div>
 
+      {/* Budget Edit Modal */}
+      <BudgetModal 
+        isOpen={isBudgetModalOpen}
+        onClose={() => setIsBudgetModalOpen(false)}
+        selectedCategory={modalBudgetCategory}
+        budgets={budgets}
+        categories={allCategories}
+        onSaveBudget={(category, amount) => {
+          onUpdateBudget?.(category, amount);
+        }}
+        onOpenAddCategory={() => {
+          setIsBudgetModalOpen(false);
+          setIsAddCategoryModalOpen(true);
+        }}
+        currentExpensesByCategory={expensesByCategory}
+      />
+
+      {/* Add New Category Line Modal */}
+      <AddCategoryModal
+        isOpen={isAddCategoryModalOpen}
+        onClose={() => setIsAddCategoryModalOpen(false)}
+        existingCategories={allCategories}
+        onAddCategory={handleAddCategory}
+      />
+
       <ConfirmModal 
         isOpen={!!categoryToClear}
         onClose={() => setCategoryToClear(null)}
         onConfirm={() => {
-          if (categoryToClear) onClearCategory?.(categoryToClear);
+          if (categoryToClear) {
+            onClearCategory?.(categoryToClear);
+            if (onDeleteCategoryBudget && !DEFAULT_CATEGORIES.includes(categoryToClear)) {
+              onDeleteCategoryBudget(categoryToClear);
+            }
+          }
         }}
-        title="Effacer la catégorie ?"
-        message={`Attention, toutes les transactions enregistrées dans la catégorie "${categoryToClear}" seront définitivement supprimées.`}
-        confirmText="Tout effacer"
+        title="Effacer ou supprimer la catégorie ?"
+        message={`Attention, toutes les transactions de "${categoryToClear}" seront supprimées.`}
+        confirmText="Confirmer la suppression"
         cancelText="Conserver"
         variant="danger"
       />
