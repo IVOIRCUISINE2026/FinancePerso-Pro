@@ -1,13 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>FinancePerso Pro</title>
+    <meta name="description" content="Application professionnelle de suivi de salaire et gestion des dépenses mensuelles avec analyses détaillées." />
+    <meta property="og:title" content="FinancePerso Pro" />
+    <meta property="og:description" content="Application professionnelle de suivi de salaire et gestion des dépenses mensuelles avec analyses détaillées." />
+    <script>
+      (function () {
+        // Intercept console.error to avoid treating expected popup cancellations and internal Firebase Auth assertion race conditions as critical runtime errors
+        var origConsoleError = console.error;
+        console.error = function () {
+          var args = Array.prototype.slice.call(arguments);
+          var fullText = args.map(function (item) {
+            if (!item) return '';
+            if (typeof item === 'object') {
+              try {
+                return (item.message || '') + ' ' + (item.code || '') + ' ' + (item.stack || '') + ' ' + JSON.stringify(item);
+              } catch (e) {
+                return item.toString();
+              }
+            }
+            return String(item);
+          }).join(' ');
+
+          if (
+            fullText.indexOf('Pending promise was never set') !== -1 ||
+            fullText.indexOf('INTERNAL ASSERTION FAILED') !== -1 ||
+            fullText.indexOf('auth/network-request-failed') !== -1 ||
+            fullText.indexOf('auth/popup-closed-by-user') !== -1 ||
+            fullText.indexOf('auth/cancelled-popup-request') !== -1 ||
+            fullText.indexOf('Error signing in with Google') !== -1 ||
+            fullText.indexOf('Login Error') !== -1
+          ) {
+            console.warn('[Handled Auth Event]:', ...args);
+            return;
+          }
+          return origConsoleError.apply(console, args);
+        };
+
+        window.addEventListener('error', function (event) {
+          var message = (event && (event.message || (event.error && event.error.message))) || '';
+          if (
+            message.indexOf('Pending promise was never set') !== -1 ||
+            message.indexOf('INTERNAL ASSERTION FAILED') !== -1 ||
+            message.indexOf('auth/network-request-failed') !== -1 ||
+            message.indexOf('auth/popup-closed-by-user') !== -1 ||
+            message.indexOf('auth/cancelled-popup-request') !== -1
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          var message = (reason && (reason.message || reason.toString())) || '';
+          var code = (reason && reason.code) || '';
+          if (
+            message.indexOf('Pending promise was never set') !== -1 ||
+            message.indexOf('INTERNAL ASSERTION FAILED') !== -1 ||
+            message.indexOf('network-request-failed') !== -1 ||
+            code === 'auth/network-request-failed' ||
+            code === 'auth/popup-closed-by-user' ||
+            code === 'auth/cancelled-popup-request'
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

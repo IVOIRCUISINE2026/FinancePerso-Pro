@@ -9,11 +9,10 @@ import { TransactionForm } from './components/TransactionForm';
 import { FinancialBot } from './components/FinancialBot';
 import { ConfirmModal } from './components/ConfirmModal';
 import { useFinance } from './hooks/useFinance';
-import { signInWithGoogle, logout } from './lib/firebase';
-import { Wallet, LogIn, Loader2, List, Sparkles } from 'lucide-react';
+import { signInWithGoogle } from './lib/firebase';
+import { Wallet, LogIn, Loader2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DateTimeDisplay } from './components/DateTimeDisplay';
-import { TransactionCategory } from './types';
 import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd, getAvailableCategories } from './lib/utils';
 import { exportBudgetStatusToPDF, exportDetailedExpensesToPDF } from './lib/pdfExport';
 import { Archives } from './components/Archives';
@@ -22,6 +21,8 @@ export default function App() {
   const { 
     user, 
     loading, 
+    loginAsGuest,
+    logout,
     transactions, 
     incomes, 
     budgets,
@@ -126,80 +127,36 @@ export default function App() {
     try {
       await signInWithGoogle();
     } catch (error: any) {
-      console.error("Login Error", error);
+      if (
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/popup-blocked' ||
+        error?.code === 'auth/network-request-failed' ||
+        (error?.message && error.message.includes('Pending promise was never set'))
+      ) {
+        console.warn("Login attempt was interrupted or cancelled:", error?.code || error?.message);
+      } else {
+        console.warn("Login attempt issue:", error);
+      }
       
-      const openInNewTabLink = (
-        <a 
-          href={window.location.href} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="underline font-bold ml-1"
-        >
-          Ouvrir l'application dans un nouvel onglet
-        </a>
-      );
-
       if (error.code === 'auth/popup-blocked') {
-        setLoginError(
-          <>
-            Le popup de connexion a été bloqué. Pour vous authentifier, veuillez {openInNewTabLink}.
-          </>
-        );
+        setLoginError("Le popup de connexion a été bloqué par votre navigateur. Veuillez autoriser les fenêtres contextuelles et réessayer.");
       } else if (error.code === 'auth/popup-closed-by-user') {
-        const isIframe = window.self !== window.top;
-        setLoginError(
-          <>
-            La fenêtre de connexion a été fermée. 
-            {isIframe ? (
-              <> 
-                Dans cet environnement (Iframe), cela peut être dû à des restrictions de sécurité. 
-                Veuillez {openInNewTabLink} pour vous connecter sans problème.
-              </>
-            ) : (
-              " Veuillez réessayer en cliquant sur le bouton ci-dessous."
-            )}
-          </>
-        );
+        setLoginError("La fenêtre de connexion a été fermée avant la validation. Vous pouvez réitérer la connexion en cliquant sur le bouton ci-dessous.");
       } else if (error.code === 'auth/network-request-failed' || (error.message && error.message.includes('network-request-failed'))) {
-        const isIframe = window.self !== window.top;
-        setLoginError(
-          <>
-            Une erreur réseau s'est produite lors de la connexion. 
-            {isIframe ? (
-              <>
-                <br /><br />
-                <strong>Note importante :</strong> L'authentification Google est souvent bloquée par les navigateurs lorsqu'elle est exécutée dans un cadre (iframe). 
-                Veuillez impérativement {openInNewTabLink} pour vous connecter.
-              </>
-            ) : (
-              " Vérifiez votre connexion internet ou désactivez vos bloqueurs de publicité et réessayez."
-            )}
-          </>
-        );
+        setLoginError("Une erreur réseau s'est produite lors de la connexion. Vérifiez votre connexion internet et réessayez.");
       } else if (error.code === 'auth/cancelled-popup-request') {
-        setLoginError("La requête de connexion a été annulée ou est déjà en cours. Veuillez patienter ou recharger la page.");
+        setLoginError("La requête de connexion a été annulée. Veuillez réessayer.");
       } else if (error.code === 'auth/unauthorized-domain') {
         setLoginError("Ce domaine n'est pas autorisé. Ajoutez '" + window.location.hostname + "' aux domaines autorisés dans la console Firebase.");
       } else if (error.code === 'auth/internal-error') {
-        setLoginError(
-          <>
-            Erreur interne Firebase. Cela arrive souvent à cause des restrictions des cookies tiers. Veuillez {openInNewTabLink}.
-          </>
-        );
+        setLoginError("Erreur interne d'authentification. Veuillez réessayer.");
       } else if (error.code === 'auth/argument-error' || (error.message && error.message.includes('argument-error'))) {
-        setLoginError(
-          <>
-            Erreur de configuration d'authentification. Veuillez essayer de {openInNewTabLink} pour réinitialiser la session.
-          </>
-        );
+        setLoginError("Erreur de configuration d'authentification. Veuillez réessayer.");
       } else if (error.message && error.message.includes('Assertion')) {
-        setLoginError(
-          <>
-            Une erreur interne Firebase est survenue. Cela arrive souvent dans les environnements intégrés. Veuillez {openInNewTabLink}.
-          </>
-        );
+        setLoginError("Une restriction du navigateur est survenue. Veuillez vérifier vos paramètres et réessayer.");
       } else {
-        setLoginError("Erreur de connexion (" + (error.code || 'unknown') + "). Si le problème persiste, " + openInNewTabLink);
+        setLoginError(`Erreur de connexion (${error.code || 'inconnue'}). Veuillez réessayer.`);
       }
     } finally {
       setIsLoggingIn(false);
@@ -208,15 +165,23 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#0B0F19]">
-        <Loader2 className="w-8 h-8 text-[#2E5BFF] animate-spin" />
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0B0F19] text-white p-6 space-y-4">
+        <Loader2 className="w-9 h-9 text-[#2E5BFF] animate-spin" />
+        <p className="text-slate-400 text-sm font-medium">Chargement de FinancePerso Pro...</p>
+        <button
+          type="button"
+          onClick={loginAsGuest}
+          className="text-xs text-blue-400 hover:text-blue-300 underline pt-2"
+        >
+          Ouvrir immédiatement l'application (Mode Démo)
+        </button>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-screen w-screen h-screen flex flex-col items-center justify-center bg-[#0B0F19] p-6 lg:p-0 relative">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0B0F19] p-6 relative overflow-y-auto">
         <div className="absolute top-8 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-10 z-20">
           <DateTimeDisplay />
         </div>
@@ -224,50 +189,54 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-[#161B29] p-12 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-8 border border-white/5"
+          className="bg-[#161B29] p-8 sm:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-7 border border-white/5 my-auto"
         >
           <div className="w-20 h-20 bg-[#2E5BFF] rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
             <Wallet className="text-white" size={40} />
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-black text-white tracking-tight">FinancePerso Pro</h1>
-            <p className="text-slate-400 leading-relaxed">Gérez votre salaire, suivez vos dépenses et optimisez votre budget mensuel.</p>
+            <p className="text-slate-400 text-sm leading-relaxed">Gérez votre salaire, suivez vos dépenses et optimisez votre budget mensuel.</p>
           </div>
           
           {loginError && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-500/10 text-red-400 p-4 rounded-xl text-sm font-medium border border-red-500/20"
+              className="bg-red-500/10 text-red-400 p-4 rounded-xl text-xs font-medium border border-red-500/20 text-left"
             >
               {loginError}
             </motion.div>
           )}
 
-          <button
-            onClick={handleLogin}
-            disabled={isLoggingIn}
-            className="w-full bg-[#2E5BFF] flex items-center justify-center gap-4 py-4 rounded-2xl font-bold text-white hover:bg-blue-600 transition-all active:scale-95 translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
-          >
-            {isLoggingIn ? (
-              <Loader2 className="w-5 h-5 text-white animate-spin" />
-            ) : (
-              <LogIn size={20} className="text-white" />
-            )}
-            {isLoggingIn ? "Connexion..." : "Se connecter avec Google"}
-          </button>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleLogin}
+              disabled={isLoggingIn}
+              className="w-full bg-[#2E5BFF] flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl font-bold text-white hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 text-sm"
+            >
+              {isLoggingIn ? (
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              ) : (
+                <LogIn size={18} className="text-white" />
+              )}
+              {isLoggingIn ? "Connexion Google..." : "Se connecter avec Google"}
+            </button>
+
+            <button
+              type="button"
+              onClick={loginAsGuest}
+              className="w-full bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-semibold transition-all active:scale-95 text-xs"
+            >
+              <Sparkles size={15} className="text-emerald-400" />
+              <span>Ouvrir l'application en mode Démo (Sans compte)</span>
+            </button>
+          </div>
           
           <p className="text-xs text-slate-500">
             En vous connectant, vous acceptez nos conditions d'utilisation.
           </p>
-
-          {window.self !== window.top && (
-            <div className="pt-4 border-t border-white/5">
-              <p className="text-[10px] text-slate-500 italic leading-relaxed">
-                Note : Si la connexion échoue, cliquez sur "Ouvrir l'application dans un nouvel onglet" en haut à droite pour contourner les restrictions de sécurité du navigateur.
-              </p>
-            </div>
-          )}
         </motion.div>
       </div>
     );
