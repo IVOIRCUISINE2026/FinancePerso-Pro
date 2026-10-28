@@ -10,12 +10,13 @@ import { FinancialBot } from './components/FinancialBot';
 import { ConfirmModal } from './components/ConfirmModal';
 import { useFinance } from './hooks/useFinance';
 import { signInWithGoogle } from './lib/firebase';
-import { Wallet, LogIn, Loader2, Sparkles } from 'lucide-react';
+import { Wallet, LogIn, Loader2, Sparkles, Video, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DateTimeDisplay } from './components/DateTimeDisplay';
 import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd, getAvailableCategories } from './lib/utils';
 import { exportBudgetStatusToPDF, exportDetailedExpensesToPDF } from './lib/pdfExport';
 import { Archives } from './components/Archives';
+import { VideoTourModal } from './components/VideoTourModal';
 
 export default function App() {
   const { 
@@ -48,6 +49,7 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<React.ReactNode | null>(null);
   const [showAutoArchiveSuccess, setShowAutoArchiveSuccess] = useState<string | null>(null);
+  const [isVideoTourOpen, setIsVideoTourOpen] = useState(false);
 
   // Automatic archive on the 25th of the month
   useEffect(() => {
@@ -233,11 +235,45 @@ export default function App() {
               <span>Ouvrir l'application en mode Démo (Sans compte)</span>
             </button>
           </div>
+
+          {/* Option FinancePerso Pro en vidéo */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setIsVideoTourOpen(true)}
+              className="w-full relative overflow-hidden bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:via-indigo-600/30 hover:to-purple-600/30 text-white border border-blue-500/30 hover:border-blue-400/50 flex items-center justify-between p-3.5 rounded-2xl transition-all duration-300 group shadow-lg shadow-blue-500/10 active:scale-95"
+            >
+              <div className="flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2E5BFF] to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform">
+                  <Video size={20} className="text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">FinancePerso Pro en vidéo</span>
+                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider">
+                      Voix off
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium">Toutes les rubriques expliquées (20s chacune avec voix off)</p>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-slate-300 group-hover:text-white group-hover:bg-[#2E5BFF] transition-all shrink-0">
+                <Play size={13} className="translate-x-0.5" />
+              </div>
+            </button>
+          </div>
           
           <p className="text-xs text-slate-500">
             En vous connectant, vous acceptez nos conditions d'utilisation.
           </p>
         </motion.div>
+
+        {/* Video Tour Modal on Home Page */}
+        <VideoTourModal 
+          isOpen={isVideoTourOpen} 
+          onClose={() => setIsVideoTourOpen(false)} 
+          onLaunchDemo={loginAsGuest}
+        />
       </div>
     );
   }
@@ -280,6 +316,7 @@ export default function App() {
         onExportStatus={handlePrint}
         onExportDetails={handleExportDetails}
         onToggleOrientation={toggleOrientation}
+        onOpenVideoTour={() => setIsVideoTourOpen(true)}
         hasBudgetAlerts={hasBudgetAlerts}
       />
 
@@ -391,6 +428,12 @@ export default function App() {
         confirmText="Compris !"
         cancelText="Fermer"
         variant="primary"
+      />
+
+      {/* Video Tour Modal in Authenticated View */}
+      <VideoTourModal 
+        isOpen={isVideoTourOpen} 
+        onClose={() => setIsVideoTourOpen(false)} 
       />
     </div>
   );

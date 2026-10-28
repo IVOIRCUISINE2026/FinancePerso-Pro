@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, PlusCircle, PieChart, Settings, LogOut, Wallet, ChevronLeft, ChevronRight, LayoutList, BarChart3, Printer, Phone, User, RotateCcw, Sparkles, Archive } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, PieChart, Settings, LogOut, Wallet, ChevronLeft, ChevronRight, LayoutList, BarChart3, Printer, Phone, User, RotateCcw, Sparkles, Archive, Video } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 import { ConfirmModal } from './ConfirmModal';
@@ -58,6 +58,7 @@ interface SidebarProps {
   onExportStatus?: () => void;
   onExportDetails?: () => void;
   onToggleOrientation?: () => void;
+  onOpenVideoTour?: () => void;
 }
 
 export function Sidebar({ 
@@ -69,6 +70,7 @@ export function Sidebar({
   onExportStatus, 
   onExportDetails,
   onToggleOrientation,
+  onOpenVideoTour,
   hasBudgetAlerts
 }: SidebarProps & { hasBudgetAlerts?: boolean }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -163,6 +165,15 @@ export function Sidebar({
             isCollapsed={isCollapsed}
           />
           
+          {onOpenVideoTour && (
+            <NavItem 
+              icon={Video} 
+              label="Pro en vidéo" 
+              onClick={onOpenVideoTour} 
+              isCollapsed={isCollapsed}
+            />
+          )}
+
           <NavItem 
             icon={Printer} 
             label="Imprimer Rapport" 
