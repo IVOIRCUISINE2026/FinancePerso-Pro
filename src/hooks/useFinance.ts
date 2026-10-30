@@ -66,6 +66,7 @@ function saveGuestStore(data: GuestStore) {
 }
 
 export function useFinance() {
+  const initialStore = loadGuestStore();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
@@ -75,6 +76,7 @@ export function useFinance() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(auth.currentUser);
   
+  // Explicit guest demo mode only if chosen by user
   const [isGuest, setIsGuest] = useState<boolean>(() => {
     try {
       return localStorage.getItem(GUEST_MODE_KEY) === 'true';
@@ -92,17 +94,17 @@ export function useFinance() {
         try {
           localStorage.removeItem(GUEST_MODE_KEY);
         } catch {}
+      } else {
+        try {
+          const guestActive = localStorage.getItem(GUEST_MODE_KEY) === 'true';
+          setIsGuest(guestActive);
+        } catch {
+          setIsGuest(false);
+        }
       }
+      setLoading(false);
     });
     return () => unsubscribeAuth();
-  }, []);
-
-  // Safeguard: Ensure loading never hangs indefinitely
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2500);
-    return () => clearTimeout(timer);
   }, []);
 
   // Main data sync effect
@@ -270,7 +272,7 @@ export function useFinance() {
       };
     }
 
-    // Case 2: Guest Mode
+    // Case 2: Guest Demo Mode (Explicitly chosen by user)
     if (isGuest) {
       const store = loadGuestStore();
       setTransactions(store.transactions);
@@ -283,7 +285,7 @@ export function useFinance() {
       return;
     }
 
-    // Case 3: Not logged in and not guest
+    // Case 3: Unauthenticated - waiting for login
     setTransactions([]);
     setIncomes([]);
     setBudgets([]);
@@ -624,9 +626,9 @@ export function useFinance() {
 
   const activeUser = user || (isGuest ? {
     uid: 'guest-user',
-    email: 'invite@financeperso.pro',
-    displayName: 'Invité Démo',
-    photoURL: ''
+    email: profile?.email || 'invite@financeperso.pro',
+    displayName: profile?.displayName || 'Invité Démo',
+    photoURL: profile?.photoURL || ''
   } as any : null);
 
   return {

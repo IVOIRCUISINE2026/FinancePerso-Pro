@@ -10,7 +10,7 @@ import { FinancialBot } from './components/FinancialBot';
 import { ConfirmModal } from './components/ConfirmModal';
 import { useFinance } from './hooks/useFinance';
 import { signInWithGoogle } from './lib/firebase';
-import { Wallet, LogIn, Loader2, Sparkles, Video, Play } from 'lucide-react';
+import { Wallet, LogIn, Loader2, Sparkles, Video, Play, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DateTimeDisplay } from './components/DateTimeDisplay';
 import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd, getAvailableCategories } from './lib/utils';
@@ -23,6 +23,7 @@ export default function App() {
   const { 
     user, 
     loading, 
+    isGuest,
     loginAsGuest,
     logout,
     transactions, 
@@ -166,124 +167,6 @@ export default function App() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0B0F19] text-white p-6 space-y-4">
-        <Loader2 className="w-9 h-9 text-[#2E5BFF] animate-spin" />
-        <p className="text-slate-400 text-sm font-medium">Chargement de FinancePerso Pro...</p>
-        <button
-          type="button"
-          onClick={loginAsGuest}
-          className="text-xs text-blue-400 hover:text-blue-300 underline pt-2"
-        >
-          Ouvrir immédiatement l'application (Mode Démo)
-        </button>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#0B0F19] p-6 relative overflow-y-auto">
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-10 z-20">
-          <DateTimeDisplay />
-        </div>
-        
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-[#161B29] p-8 sm:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-7 border border-white/5 my-auto"
-        >
-          <div className="w-20 h-20 bg-[#2E5BFF] rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-500/20">
-            <Wallet className="text-white" size={40} />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black text-white tracking-tight">FinancePerso Pro</h1>
-            <p className="text-slate-400 text-sm leading-relaxed">Gérez votre salaire, suivez vos dépenses et optimisez votre budget mensuel.</p>
-          </div>
-          
-          {loginError && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="w-full text-left"
-            >
-              {typeof loginError === 'string' ? (
-                <div className="bg-red-500/10 text-red-400 p-4 rounded-xl text-xs font-medium border border-red-500/20">
-                  {loginError}
-                </div>
-              ) : (
-                loginError
-              )}
-            </motion.div>
-          )}
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={handleLogin}
-              disabled={isLoggingIn}
-              className="w-full bg-[#2E5BFF] flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl font-bold text-white hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 text-sm"
-            >
-              {isLoggingIn ? (
-                <Loader2 className="w-5 h-5 text-white animate-spin" />
-              ) : (
-                <LogIn size={18} className="text-white" />
-              )}
-              {isLoggingIn ? "Connexion Google..." : "Se connecter avec Google"}
-            </button>
-
-            <button
-              type="button"
-              onClick={loginAsGuest}
-              className="w-full bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-semibold transition-all active:scale-95 text-xs"
-            >
-              <Sparkles size={15} className="text-emerald-400" />
-              <span>Ouvrir l'application en mode Démo (Sans compte)</span>
-            </button>
-          </div>
-
-          {/* Option FinancePerso Pro en vidéo */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setIsVideoTourOpen(true)}
-              className="w-full relative overflow-hidden bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:via-indigo-600/30 hover:to-purple-600/30 text-white border border-blue-500/30 hover:border-blue-400/50 flex items-center justify-between p-3.5 rounded-2xl transition-all duration-300 group shadow-lg shadow-blue-500/10 active:scale-95"
-            >
-              <div className="flex items-center gap-3 text-left">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2E5BFF] to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform">
-                  <Video size={20} className="text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-sm">FinancePerso Pro en vidéo</span>
-                    <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider">
-                      Voix off
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-medium">Toutes les rubriques expliquées (20s chacune avec voix off)</p>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-slate-300 group-hover:text-white group-hover:bg-[#2E5BFF] transition-all shrink-0">
-                <Play size={13} className="translate-x-0.5" />
-              </div>
-            </button>
-          </div>
-          
-          <p className="text-xs text-slate-500">
-            En vous connectant, vous acceptez nos conditions d'utilisation.
-          </p>
-        </motion.div>
-
-        {/* Video Tour Modal on Home Page */}
-        <VideoTourModal 
-          isOpen={isVideoTourOpen} 
-          onClose={() => setIsVideoTourOpen(false)} 
-          onLaunchDemo={loginAsGuest}
-        />
-      </div>
-    );
-  }
 
   const handleAddTransaction = async (data: { amount: number, category: string, date: number, note: string }) => {
     await addTransaction(data);
@@ -297,6 +180,146 @@ export default function App() {
       alert(`Attention ! Votre solde (${formatCurrency(balance)}) est inférieur à 10% de votre salaire.`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#2E5BFF]/10 rounded-full blur-[140px] pointer-events-none" />
+        <div className="w-16 h-16 rounded-3xl bg-[#2E5BFF] flex items-center justify-center shadow-xl shadow-blue-500/25 mb-6 animate-pulse">
+          <Wallet size={32} className="text-white" />
+        </div>
+        <div className="flex items-center gap-3 text-slate-300 font-bold text-sm">
+          <Loader2 className="animate-spin text-[#2E5BFF]" size={18} />
+          <span>Sécurisation & Vérification de session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && !isGuest) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center p-4 md:p-6 text-white relative overflow-y-auto">
+        {/* Ambient Glow */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#2E5BFF]/10 rounded-full blur-[140px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[140px]" />
+        </div>
+
+        {/* Date Time Bar at Top */}
+        <div className="w-full max-w-md flex justify-center mb-6 z-10">
+          <DateTimeDisplay />
+        </div>
+
+        <div className="w-full max-w-md bg-[#161B29]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center shadow-2xl relative z-10 space-y-6">
+          {/* Logo */}
+          <div className="w-20 h-20 rounded-3xl bg-[#2E5BFF] flex items-center justify-center shadow-2xl shadow-blue-500/40 relative group">
+            <Wallet size={38} className="text-white" />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[#161B29] flex items-center justify-center text-white text-[10px]">
+              <ShieldCheck size={12} />
+            </div>
+          </div>
+
+          {/* Heading */}
+          <div className="space-y-2">
+            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
+              FinancePerso Pro
+            </h1>
+            <p className="text-slate-400 text-xs md:text-sm leading-relaxed max-w-sm mx-auto">
+              Gérez votre salaire, suivez vos dépenses et optimisez votre budget mensuel.
+            </p>
+          </div>
+
+          {/* Security badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+            <ShieldCheck size={14} className="text-blue-400" />
+            <span>Sécurité Firebase Authentication Activée</span>
+          </div>
+
+          {/* Error notice if present */}
+          {loginError && (
+            <div className="w-full">
+              {typeof loginError === 'string' ? (
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-xs text-rose-300 text-left space-y-2">
+                  <div className="font-bold flex items-center gap-1.5 text-rose-200">
+                    <ShieldAlert size={16} />
+                    <span>Notification de connexion</span>
+                  </div>
+                  <p>{loginError}</p>
+                </div>
+              ) : (
+                loginError
+              )}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="w-full space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={handleLogin}
+              disabled={isLoggingIn}
+              className="w-full bg-[#2E5BFF] hover:bg-[#254ED9] text-white py-3.5 px-6 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>Connexion en cours...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={18} />
+                  <span>Se connecter avec Google</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={loginAsGuest}
+              className="w-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 py-3 px-6 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 text-xs text-slate-300 hover:text-white"
+            >
+              <Sparkles size={14} className="text-emerald-400" />
+              <span>Ouvrir l'application en mode Démo (Sans compte)</span>
+            </button>
+          </div>
+
+          {/* Video Tour card matching design */}
+          <div 
+            onClick={() => setIsVideoTourOpen(true)}
+            className="w-full bg-gradient-to-r from-blue-600/15 via-indigo-600/15 to-purple-600/15 hover:from-blue-600/25 hover:via-indigo-600/25 hover:to-purple-600/25 border border-blue-500/30 rounded-2xl p-3.5 transition-all cursor-pointer group flex items-center justify-between gap-3 text-left shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-[#2E5BFF] flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                <Video size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-bold text-white text-xs md:text-sm">FinancePerso Pro en vidéo</span>
+                  <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border border-emerald-500/30">
+                    Voix off
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">Toutes les rubriques (20s chacune avec voix off)</p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center text-white shrink-0 transition-colors">
+              <Play size={12} className="fill-white" />
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            En vous connectant, vous acceptez nos conditions d'utilisation.
+          </p>
+        </div>
+
+        {/* Video Tour Modal */}
+        <VideoTourModal 
+          isOpen={isVideoTourOpen} 
+          onClose={() => setIsVideoTourOpen(false)} 
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#0B0F19] relative overflow-hidden">
@@ -346,7 +369,40 @@ export default function App() {
       </motion.button>
 
       <main className="flex-1 overflow-y-auto p-6 md:p-10 relative">
-        <div className="flex justify-end mb-8 sticky top-0 z-20 pointer-events-none">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 sticky top-0 z-20 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsVideoTourOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:via-indigo-600/30 hover:to-purple-600/30 border border-blue-500/30 text-white text-xs font-bold transition-all shadow-sm active:scale-95 group"
+            >
+              <div className="w-5 h-5 rounded-lg bg-[#2E5BFF] flex items-center justify-center text-white shrink-0">
+                <Video size={12} />
+              </div>
+              <span>FinancePerso Pro en vidéo</span>
+              <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider border border-emerald-500/30">
+                Voix off
+              </span>
+            </button>
+            {isGuest ? (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+                <Sparkles size={13} className="text-amber-400" />
+                <span>Mode Démo (Invité)</span>
+                <button
+                  type="button"
+                  onClick={handleLogin}
+                  className="ml-1 underline text-white hover:text-amber-200 font-bold"
+                >
+                  Se connecter
+                </button>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+                <ShieldCheck size={14} className="text-blue-400" />
+                <span>Sécurité Firebase Activée</span>
+              </div>
+            )}
+          </div>
           <div className="pointer-events-auto">
             <DateTimeDisplay />
           </div>
@@ -419,6 +475,10 @@ export default function App() {
                 onAddSalary={addIncome} 
                 onUpdateProfile={updateUserProfile}
                 onAddReport={addReport}
+                isGuest={isGuest}
+                onLoginGoogle={handleLogin}
+                isLoggingIn={isLoggingIn}
+                loginError={loginError}
               />
             )}
           </motion.div>

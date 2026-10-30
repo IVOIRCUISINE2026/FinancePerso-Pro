@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
-import { User as UserIcon, Wallet, CreditCard, Save, Bell, Mail, RefreshCw } from 'lucide-react';
+import { User as UserIcon, Wallet, CreditCard, Save, Bell, Mail, RefreshCw, ShieldCheck, Lock } from 'lucide-react';
 import { Income, UserProfile, Transaction, FinancialReport } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { generateFinancialReport } from '../services/geminiService';
@@ -17,9 +17,26 @@ interface SettingsProps {
   onAddSalary: (amount: number) => void;
   onUpdateProfile: (data: Partial<UserProfile>) => void;
   onAddReport: (content: string) => void;
+  isGuest?: boolean;
+  onLoginGoogle?: () => void;
+  isLoggingIn?: boolean;
+  loginError?: React.ReactNode | null;
 }
 
-export function Settings({ user, incomes, transactions, reports, profile, onAddSalary, onUpdateProfile, onAddReport }: SettingsProps) {
+export function Settings({ 
+  user, 
+  incomes, 
+  transactions, 
+  reports, 
+  profile, 
+  onAddSalary, 
+  onUpdateProfile, 
+  onAddReport,
+  isGuest = true,
+  onLoginGoogle,
+  isLoggingIn = false,
+  loginError = null
+}: SettingsProps) {
   const [salary, setSalary] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportContent, setReportContent] = useState<string | null>(null);
@@ -82,12 +99,63 @@ export function Settings({ user, incomes, transactions, reports, profile, onAddS
                    )}
                 </div>
                 <div>
-                  <h3 className="font-black text-2xl text-slate-800 tracking-tight">{user?.displayName || "Utilisateur"}</h3>
-                  <p className="text-slate-400 font-medium">{user?.email}</p>
-                  <div className="mt-2 flex gap-2">
-                    <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full border border-blue-100">Membre Premium</span>
+                  <h3 className="font-black text-2xl text-slate-800 tracking-tight">{profile?.displayName || user?.displayName || (isGuest ? "Invité Démo" : "Utilisateur FinancePerso")}</h3>
+                  <p className="text-slate-400 font-medium">{user?.email || (isGuest ? "Compte Démo local" : "Session sécurisée")}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {user ? (
+                      <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-full border border-blue-100 flex items-center gap-1.5">
+                        <ShieldCheck size={12} className="text-blue-500" />
+                        Sécurité Firebase Active
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-black uppercase rounded-full border border-amber-200 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        Mode Démo (Invité)
+                      </span>
+                    )}
+                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100">Membre Pro</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Security info banner */}
+              <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-600 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-slate-800 uppercase text-[10px] tracking-wider">État de la sécurité Firebase</span>
+                  {user ? (
+                    <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded-md uppercase flex items-center gap-1">
+                      <Lock size={10} />
+                      Sécurisé & Authentifié
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-black rounded-md uppercase">
+                      Compte Démo
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  {user 
+                    ? "L'authentification Firebase est activée et sécurise vos données. Chaque transaction, budget et archive est chiffré et stocké sous votre identifiant unique Cloud."
+                    : "Vous êtes actuellement en mode Démo local. Connectez-vous avec votre compte Google pour synchroniser et sécuriser vos données sur Firebase Firestore."
+                  }
+                </p>
+                {onLoginGoogle && !user && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={onLoginGoogle}
+                      disabled={isLoggingIn}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 shadow-md shadow-blue-500/20"
+                    >
+                      {isLoggingIn ? "Connexion Google en cours..." : "Se connecter avec Google"}
+                    </button>
+                    {loginError && (
+                      <div className="mt-3">
+                        {loginError}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-6">

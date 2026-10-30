@@ -230,9 +230,9 @@ export function Sidebar({
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={onLogout}
         title="Se déconnecter ?"
-        message="Vos données sont sauvegardées en toute sécurité dans le cloud et ne seront pas effacées. Vous pourrez les retrouver en vous reconnectant."
-        confirmText="Déconnexion"
-        cancelText="Rester connecté"
+        message="Souhaitez-vous vous déconnecter de votre session FinancePerso Pro ? Vos données restent protégées et sauvegardées en toute sécurité sur le Cloud."
+        confirmText="Se déconnecter"
+        cancelText="Annuler"
         variant="danger"
       />
 
