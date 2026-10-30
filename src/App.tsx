@@ -17,6 +17,7 @@ import { formatCurrency, cn, getBudgetPeriodStart, getBudgetPeriodEnd, getAvaila
 import { exportBudgetStatusToPDF, exportDetailedExpensesToPDF } from './lib/pdfExport';
 import { Archives } from './components/Archives';
 import { VideoTourModal } from './components/VideoTourModal';
+import { UnauthorizedDomainBanner } from './components/UnauthorizedDomainBanner';
 
 export default function App() {
   const { 
@@ -149,8 +150,8 @@ export default function App() {
         setLoginError("Une erreur réseau s'est produite lors de la connexion. Vérifiez votre connexion internet et réessayez.");
       } else if (error.code === 'auth/cancelled-popup-request') {
         setLoginError("La requête de connexion a été annulée. Veuillez réessayer.");
-      } else if (error.code === 'auth/unauthorized-domain') {
-        setLoginError("Ce domaine n'est pas autorisé. Ajoutez '" + window.location.hostname + "' aux domaines autorisés dans la console Firebase.");
+      } else if (error.code === 'auth/unauthorized-domain' || (error.message && error.message.includes('unauthorized-domain'))) {
+        setLoginError(<UnauthorizedDomainBanner onContinueGuest={loginAsGuest} />);
       } else if (error.code === 'auth/internal-error') {
         setLoginError("Erreur interne d'authentification. Veuillez réessayer.");
       } else if (error.code === 'auth/argument-error' || (error.message && error.message.includes('argument-error'))) {
@@ -205,9 +206,15 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-500/10 text-red-400 p-4 rounded-xl text-xs font-medium border border-red-500/20 text-left"
+              className="w-full text-left"
             >
-              {loginError}
+              {typeof loginError === 'string' ? (
+                <div className="bg-red-500/10 text-red-400 p-4 rounded-xl text-xs font-medium border border-red-500/20">
+                  {loginError}
+                </div>
+              ) : (
+                loginError
+              )}
             </motion.div>
           )}
 
